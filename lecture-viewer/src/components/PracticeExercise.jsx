@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import CodeEditor from './CodeEditor';
 
 function PracticeExercise({ exercise }) {
     const [code, setCode] = useState(exercise.starterCode);
@@ -34,10 +35,9 @@ function PracticeExercise({ exercise }) {
                     <span className="code-editor-dot yellow"></span>
                     <span className="code-editor-dot green"></span>
                 </div>
-                <textarea
+                <CodeEditor
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    spellCheck={false}
+                    onChange={setCode}
                     placeholder="Write your code here..."
                 />
             </div>

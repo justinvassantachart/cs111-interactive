@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import './App.css';
 import LectureViewer from './components/LectureViewer';
-import lecture4 from './lectures/lecture4';
+import { lectures, lectureList } from './lectures';
 
 function App() {
-  const [currentLecture] = useState(lecture4);
+  const [currentLectureId, setCurrentLectureId] = useState(4);
+  const currentLecture = lectures[currentLectureId];
 
   return (
     <div className="app">
@@ -16,12 +17,22 @@ function App() {
             <span className="logo-text">Interactive</span>
           </h1>
           <nav className="nav">
-            <button className="nav-btn active">Lecture 4</button>
+            <select
+              className="lecture-select"
+              value={currentLectureId}
+              onChange={(e) => setCurrentLectureId(Number(e.target.value))}
+            >
+              {lectureList.map((lecture) => (
+                <option key={lecture.id} value={lecture.id}>
+                  Lecture {lecture.id}: {lecture.title}
+                </option>
+              ))}
+            </select>
           </nav>
         </div>
       </header>
       <main className="app-main">
-        <LectureViewer lecture={currentLecture} />
+        <LectureViewer key={currentLectureId} lecture={currentLecture} />
       </main>
     </div>
   );

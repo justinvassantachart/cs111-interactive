@@ -3,7 +3,7 @@ export const lecture4 = {
   title: "Unix V6 Filesystem, Continued",
   subtitle: "Directories, Lookup, and Doubly-Indirect Addressing",
   keyTakeaway: "The Unix V6 Filesystem represents directories as files, with payloads containing directory entries. Lookup begins at the root directory for absolute paths.",
-  
+
   sections: [
     {
       id: "recap",
@@ -33,7 +33,19 @@ export const lecture4 = {
 /* Important mode flags */
 #define IALLOC  0x8000    // file is used
 #define IFDIR   0x4000    // directory
-#define ILARG   0x1000    // large addressing algorithm`
+#define ILARG   0x1000    // large addressing algorithm`,
+        annotations: [
+          { match: "i_mode", explanation: "A 16-bit field combining file type (regular, directory, device) and permission bits (read/write/execute for owner/group/other)." },
+          { match: "i_nlink", explanation: "Link count - how many directory entries point to this inode. When this reaches 0 and no processes have the file open, the inode is freed." },
+          { match: "i_uid", explanation: "User ID of the file's owner. Used for permission checking." },
+          { match: "i_gid", explanation: "Group ID of the file's owner. Used for permission checking." },
+          { match: "i_size0", explanation: "The most significant byte of the file size. Combined with i_size1 to form a 24-bit size (max ~16MB)." },
+          { match: "i_size1", explanation: "The lower 16 bits of the file size. The full size is (i_size0 << 16) | i_size1." },
+          { match: "i_addr", explanation: "Array of 8 block numbers. For small files, these point directly to data. For large files, they point to indirect blocks." },
+          { match: "IALLOC", explanation: "Bit flag in i_mode indicating this inode is allocated (in use). If not set, the inode slot is free." },
+          { match: "IFDIR", explanation: "Bit flag in i_mode indicating this is a directory (not a regular file or device)." },
+          { match: "ILARG", explanation: "Bit flag in i_mode indicating 'large' addressing mode - i_addr contains indirect block numbers instead of direct data blocks." }
+        ]
       }
     },
     {
@@ -81,7 +93,16 @@ int inode_iget(const struct unixfilesystem *fs, int inumber,
     struct inode foundInode = inodesBlock[(inumber - 1) % AMOUNT_INODES_PER_BLOCK];
     *inp = foundInode;
     return 0;
-}`
+}`,
+        annotations: [
+          { match: "DISKIMG_SECTOR_SIZE", explanation: "The size of a disk sector (block) in bytes, typically 512 bytes in Unix V6." },
+          { match: "inumber", explanation: "Inode number - a unique identifier for a file. Inumbers start at 1 (0 means NULL/invalid)." },
+          { match: "INODE_START_SECTOR", explanation: "The first disk block containing inodes, typically block 2 (after boot block and superblock)." },
+          { match: "diskimg_readsector", explanation: "Low-level function that reads a single 512-byte sector from the disk image into memory." },
+          { match: "dfd", explanation: "Disk file descriptor - a handle to the open disk image file." },
+          { match: "inumber - 1", explanation: "Subtract 1 because inumbers are 1-indexed but array positions are 0-indexed." },
+          { match: "inodesBlock", explanation: "A buffer to hold all inodes from one disk block. With 16 inodes per block, we read the whole block and extract the one we need." }
+        ]
       }
     },
     {
@@ -156,7 +177,17 @@ int inode_iget(const struct unixfilesystem *fs, int inumber,
             
         return finalBlock[fileBlockIndex % AMOUNT_BLOCK_NUMBERS_PER_BLOCK];
     }
-}`
+}`,
+        annotations: [
+          { match: "fileBlockIndex", explanation: "The logical block number within the file (0 = first 512 bytes, 1 = next 512, etc.). Different from physical disk block number." },
+          { match: "inode_getsize", explanation: "Returns the file size in bytes by combining i_size0 and i_size1 fields." },
+          { match: "ILARG", explanation: "Flag in i_mode indicating 'large' file mode. If set, i_addr contains indirect block numbers." },
+          { match: "AMOUNT_BLOCK_NUMBERS_PER_BLOCK", explanation: "How many block numbers fit in one block: 512 bytes / 2 bytes = 256 block numbers." },
+          { match: "inodeBlockIndex", explanation: "Which singly-indirect block (0-6 or in the doubly-indirect) contains our target block number." },
+          { match: "Singly-indirect", explanation: "One level of indirection: i_addr points to a block containing block numbers. Read that block, then get the final block number." },
+          { match: "Doubly-indirect", explanation: "Two levels: i_addr[7] points to a block of pointers to singly-indirect blocks. Two reads needed to get final block number." },
+          { match: "overflowBlock", explanation: "Buffer holding the contents of the doubly-indirect block - an array of pointers to singly-indirect blocks." }
+        ]
       }
     },
     {
@@ -186,7 +217,14 @@ struct direntv6 {
 //    1      | ".."          <- parent directory  
 //   23      | "myfile.txt"
 //   54      | "song.mp3"
-// 1245      | "prez.pptx"`
+// 1245      | "prez.pptx"`,
+        annotations: [
+          { match: "MAX_COMPONENT_LENGTH", explanation: "The maximum filename length in Unix V6: 14 characters. Longer names are not supported." },
+          { match: "d_inumber", explanation: "The inode number this directory entry refers to. 0 means the entry is empty/deleted." },
+          { match: "d_name", explanation: "The filename. May NOT be null-terminated if exactly 14 characters! Always use strncmp for comparison." },
+          { match: "\".\"", explanation: "Special entry pointing to the current directory itself. Every directory has this." },
+          { match: "\"..\"", explanation: "Special entry pointing to the parent directory. For root, this points to itself (inode 1)." }
+        ]
       }
     },
     {
@@ -263,7 +301,15 @@ int pathname_lookup(const struct unixfilesystem *fs, const char *pathname) {
     }
     
     return currentDirInumber;  // Return the final inode number
-}`
+}`,
+        annotations: [
+          { match: "ROOT_INUMBER", explanation: "The inode number of the root directory, always 1 in Unix. Inode 0 is reserved as NULL/invalid." },
+          { match: "pathname", explanation: "An absolute path like '/home/user/file.txt'. Must start with '/' for absolute paths." },
+          { match: "strsep", explanation: "Splits a string by a delimiter, returning tokens one at a time. Modifies the input string (hence we work on a copy)." },
+          { match: "token", explanation: "One component of the path. For '/home/user/file.txt', tokens are 'home', 'user', 'file.txt'." },
+          { match: "directory_findname", explanation: "Searches a directory (by inode number) for an entry with the given name. Returns the matching direntv6." },
+          { match: "currentDirInumber", explanation: "Tracks our position as we traverse the path. Updated after finding each component." }
+        ]
       }
     },
     {
@@ -316,7 +362,15 @@ int pathname_lookup(const struct unixfilesystem *fs, const char *pathname) {
         }
     }
     return -1;  // Not found
-}`
+}`,
+        annotations: [
+          { match: "dirinumber", explanation: "The inode number of the directory to search in." },
+          { match: "dirInode", explanation: "The loaded inode structure for the directory we're searching." },
+          { match: "numEntries", explanation: "Total number of directory entries, calculated from directory size / entry size (16 bytes each)." },
+          { match: "entriesPerBlock", explanation: "How many 16-byte directory entries fit in one 512-byte block: 512/16 = 32 entries." },
+          { match: "file_getblock", explanation: "Reads a logical block of a file's data. Handles the inode lookup and indirection automatically." },
+          { match: "strncmp", explanation: "Compares at most N characters. Critical here because d_name may not be null-terminated if exactly 14 chars." }
+        ]
       }
     },
     {
@@ -361,7 +415,14 @@ int pathname_lookup(const struct unixfilesystem *fs, const char *pathname) {
     } else {
         return remaining;  // Partial block (last block of file)
     }
-}`
+}`,
+        annotations: [
+          { match: "void *buf", explanation: "A pointer to a buffer where the block data will be stored. Must be at least 512 bytes." },
+          { match: "inode_indexlookup", explanation: "Translates a logical block index (0, 1, 2...) to a physical disk block number, handling indirection for large files." },
+          { match: "blockNumber", explanation: "The physical disk block number where this file's data is stored." },
+          { match: "remaining", explanation: "How many valid bytes are in this block. For the last block of a file, may be less than 512." },
+          { match: "Partial block", explanation: "The last block of a file often isn't fully used. Returns actual valid bytes instead of full 512." }
+        ]
       }
     },
     {
@@ -387,7 +448,7 @@ int pathname_lookup(const struct unixfilesystem *fs, const char *pathname) {
       ]
     }
   ],
-  
+
   exercises: [
     {
       id: "ex1",

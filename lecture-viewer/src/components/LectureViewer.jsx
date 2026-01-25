@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PracticeExercise from './PracticeExercise';
+import CodeBlock from './CodeBlock';
 
 const sectionIcons = {
     'recap': '📋',
@@ -14,12 +15,61 @@ const sectionIcons = {
 
 function LectureViewer({ lecture }) {
     const [activeSection, setActiveSection] = useState(lecture.sections[0]?.id);
+    const isScrollingRef = useRef(false);
+
+    // Scroll-spy: Update activeSection based on scroll position
+    useEffect(() => {
+        // Get all section IDs including exercises
+        const sectionIds = [...lecture.sections.map(s => s.id), 'exercises'];
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                // Don't update if user just clicked a nav link (smooth scrolling)
+                if (isScrollingRef.current) return;
+
+                // Find the topmost visible section
+                const visibleEntries = entries.filter(entry => entry.isIntersecting);
+
+                if (visibleEntries.length > 0) {
+                    // Sort by their position in the viewport (top to bottom)
+                    const sorted = visibleEntries.sort((a, b) => {
+                        return a.boundingClientRect.top - b.boundingClientRect.top;
+                    });
+
+                    // Use the section closest to the top of viewport
+                    setActiveSection(sorted[0].target.id);
+                }
+            },
+            {
+                // Trigger when section is 20% visible from the top
+                rootMargin: '-20% 0px -70% 0px',
+                threshold: 0
+            }
+        );
+
+        // Observe all sections
+        sectionIds.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                observer.observe(element);
+            }
+        });
+
+        return () => observer.disconnect();
+    }, [lecture.sections]);
 
     const scrollToSection = (sectionId) => {
         setActiveSection(sectionId);
+        isScrollingRef.current = true;
+
         const element = document.getElementById(sectionId);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth' });
+
+            // Reset the scrolling flag after animation completes
+            setTimeout(() => {
+                isScrollingRef.current = false;
+            }, 1000);
         }
     };
 
@@ -89,17 +139,7 @@ function LectureViewer({ lecture }) {
                             )}
 
                             {section.codeExample && (
-                                <div className="code-block">
-                                    <div className="code-header">
-                                        <span className="code-title">
-                                            📝 {section.codeExample.title}
-                                        </span>
-                                        <span className="code-lang">{section.codeExample.language}</span>
-                                    </div>
-                                    <div className="code-content">
-                                        <pre><code>{section.codeExample.code}</code></pre>
-                                    </div>
-                                </div>
+                                <CodeBlock codeExample={section.codeExample} />
                             )}
 
                             {section.advantages && section.disadvantages && (
