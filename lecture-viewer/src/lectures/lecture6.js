@@ -856,36 +856,36 @@ The LogPatch format is idempotent:
                 language: "cpp",
                 code: `// From replay.cc - Replaying log entries idempotently
 
-void V6Replay:: apply(const LogPatch & e) {
+void V6Replay::apply(const LogPatch &e) {
     // LogPatch is idempotent: "write these bytes at this location"
     // Running multiple times = same result!
 
-    // Read the block
-    char block[SECTOR_SIZE];
-    fs_.readblock(block, e.blockno);
+    // Read the block using the Buffer API
+    Ref<Buffer> bp = fs_.bread(e.blockno);
 
     // Apply the patch: write bytes at specified offset
-    memcpy(block + e.offset_in_block, e.bytes.data(), e.bytes.size());
+    memcpy(bp->mem_ + e.offset_in_block, e.bytes.data(), e.bytes.size());
 
-    // Write back
-    fs_.writeblock(block, e.blockno);
+    // Mark dirty for delayed write
+    bp->bdwrite();
 }
 
-void V6Replay:: apply(const LogBlockFree & e) {
+void V6Replay::apply(const LogBlockFree &e) {
     // Mark block as free in bitmap
     // Idempotent: marking free twice = still free
     freemap_.at(e.blockno) = true;
 }
 
-void V6Replay:: apply(const LogBlockAlloc & e) {
+void V6Replay::apply(const LogBlockAlloc &e) {
     // Mark block as used in bitmap
     freemap_.at(e.blockno) = false;
 
     // Zero the block if it's metadata
     if (e.zero_on_replay) {
-        char zeros[SECTOR_SIZE];
-        memset(zeros, 0, sizeof(zeros));
-        fs_.writeblock(zeros, e.blockno);
+        // Use bget since we're overwriting entire block (no need to read)
+        Ref<Buffer> bp = fs_.bget(e.blockno);
+        memset(bp->mem_, 0, SECTOR_SIZE);
+        bp->bdwrite();
     }
     // Idempotent: marking used twice = still used
     //             zeroing twice = still zeroed
@@ -1271,15 +1271,14 @@ void V6Replay::apply(const LogPatch &e) {
     // e.offset_in_block: offset within the block
     // e.bytes: the bytes to write at that offset
     
-    // Step 1: Read the block from disk
-    char block[SECTOR_SIZE];
-    fs_.readblock(block, e.blockno);
+    // Step 1: Read the block from disk using Buffer API
+    Ref<Buffer> bp = fs_.bread(e.blockno);
     
     // Step 2: Apply the patch (copy bytes to correct offset)
-    memcpy(block + e.offset_in_block, e.bytes.data(), e.bytes.size());
+    memcpy(bp->mem_ + e.offset_in_block, e.bytes.data(), e.bytes.size());
     
-    // Step 3: Write the block back to disk
-    fs_.writeblock(block, e.blockno);
+    // Step 3: Mark dirty for delayed write
+    bp->bdwrite();
 }
 
 /*
@@ -1325,9 +1324,10 @@ void V6Replay::apply(const LogBlockAlloc &e) {
     
     // Step 2: If zero_on_replay, zero out the block
     if (e.zero_on_replay) {
-        char zeros[SECTOR_SIZE];
-        memset(zeros, 0, sizeof(zeros));
-        fs_.writeblock(zeros, e.blockno);
+        // Use bget() since we're overwriting entire block (no need to read)
+        Ref<Buffer> bp = fs_.bget(e.blockno);
+        memset(bp->mem_, 0, SECTOR_SIZE);
+        bp->bdwrite();
     }
 }
 

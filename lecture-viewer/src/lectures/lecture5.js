@@ -241,6 +241,79 @@ CacheEntryBase* CacheBase::lookup(V6FS *dev, uint16_t id) {
             }
         },
         {
+            id: "buffer-api",
+            title: "The Buffer API: Using the Block Cache",
+            content: `In assign2, we interact with the block cache through the **Buffer** class. A Buffer wraps a cached disk block, providing access to its data and methods to control when it's written to disk. The key functions are **bread()** to read a block, **bget()** to get a buffer without reading, and **bdwrite()** to mark it for delayed write.`,
+            keyPoints: [
+                "Ref<Buffer> bp = fs_.bread(blockno) — read block from disk (or cache)",
+                "Ref<Buffer> bp = fs_.bget(blockno) — get buffer without reading (for overwrites)",
+                "bp->mem_ — raw bytes of the block (char[512])",
+                "bp->at<T>(i) — typed access to block contents",
+                "bp->bdwrite() — mark dirty for delayed write",
+                "bp->bwrite() — force immediate write to disk"
+            ],
+            codeExample: {
+                title: "Buffer API usage in assign2",
+                language: "cpp",
+                code: `// From v6fs.hh - Buffer wraps a cached disk block
+struct Buffer : CacheEntryBase {
+    alignas(uint32_t) char mem_[SECTOR_SIZE]; // Actual 512 bytes
+
+    uint16_t blockno() const { return id_; }
+    void bwrite();              // Write the buffer immediately
+    void bdwrite() {            // Write buffer later (delayed write)
+        initialized_ = dirty_ = true;
+    }
+    template<typename T> T &at(size_t i) {
+        return reinterpret_cast<T *>(mem_)[i];
+    }
+};
+
+// In V6FS class:
+Ref<Buffer> bread(uint16_t blockno); // Read block from disk
+Ref<Buffer> bget(uint16_t blockno);  // Get buffer without reading
+
+// Example: Reading and modifying a block
+void example_modify_block(V6FS &fs, uint16_t blockno) {
+    // Read block into cache (or get from cache if already there)
+    Ref<Buffer> bp = fs.bread(blockno);
+    
+    // Access the raw bytes
+    char *data = bp->mem_;
+    
+    // Or use typed access (e.g., for indirect blocks)
+    uint16_t first_ptr = bp->at<uint16_t>(0);
+    
+    // Modify the block
+    bp->mem_[10] = 'X';
+    
+    // Mark dirty - will be written later during cache flush
+    bp->bdwrite();
+    
+    // When Ref<Buffer> goes out of scope, the buffer stays in cache
+}
+
+// Example: Allocating a new block (no need to read old contents)
+void example_alloc_block(V6FS &fs, uint16_t blockno) {
+    // Use bget() when we'll overwrite the entire block anyway
+    Ref<Buffer> bp = fs.bget(blockno);  // Faster - no disk read!
+    
+    memset(bp->mem_, 0, SECTOR_SIZE);   // Zero out the block
+    bp->bdwrite();                       // Mark for writeback
+}`,
+                annotations: [
+                    { match: "Ref<Buffer>", explanation: "A reference-counted smart pointer to a Buffer. When all Refs go out of scope, the Buffer can be evicted from cache (but dirty buffers are written first)." },
+                    { match: "mem_[SECTOR_SIZE]", explanation: "The actual 512 bytes of the disk block. You can read/write this directly or use at<T>() for typed access." },
+                    { match: "bread(blockno)", explanation: "Reads block from disk into cache (or returns cached copy if already present). Use this when you need to see the current contents." },
+                    { match: "bget(blockno)", explanation: "Gets a buffer for the block WITHOUT reading from disk. Use when you'll completely overwrite the block anyway - faster than bread()." },
+                    { match: "bdwrite()", explanation: "Marks the buffer as dirty for DELAYED write. The actual disk write happens later during sync() or cache eviction. Fast but data at risk until flushed." },
+                    { match: "bwrite()", explanation: "Forces IMMEDIATE write to disk. Slower but guarantees data is on disk when function returns. Use for critical data." },
+                    { match: "at<uint16_t>(0)", explanation: "Typed access: treats mem_ as array of uint16_t and returns element 0. Useful for indirect blocks which store arrays of block numbers." },
+                    { match: "alignas(uint32_t)", explanation: "Ensures mem_ is aligned to 4-byte boundary. Required for typed access with at<T>() to work correctly without alignment faults." }
+                ]
+            }
+        },
+        {
             id: "delayed-writes-problem",
             title: "The Delayed Writes Problem",
             content: `Delayed writes make the system faster, but they also mean the block cache can **reorder operations**. If we perform operations A, B, C and they're all cached, when the cache flushes (after ~30 seconds), it might write them in order B, C, A. If we crash during the flush, we get an inconsistent state.`,
