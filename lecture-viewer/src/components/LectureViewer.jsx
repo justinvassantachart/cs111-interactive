@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import PracticeExercise from './PracticeExercise';
 import CodeBlock from './CodeBlock';
 
@@ -13,9 +13,12 @@ const sectionIcons = {
     'summary': '✨'
 };
 
-function LectureViewer({ lecture }) {
-    const [activeSection, setActiveSection] = useState(lecture.sections[0]?.id);
+function LectureViewer({ lecture, activeSection, onActiveSectionChange }) {
     const isScrollingRef = useRef(false);
+
+    // Use internal state if no props provided (backwards compatibility)
+    const currentActiveSection = activeSection || lecture.sections[0]?.id;
+    const setActiveSection = onActiveSectionChange || (() => { });
 
     // Scroll-spy: Update activeSection based on scroll position
     useEffect(() => {
@@ -56,7 +59,7 @@ function LectureViewer({ lecture }) {
         });
 
         return () => observer.disconnect();
-    }, [lecture.sections]);
+    }, [lecture.sections, setActiveSection]);
 
     const scrollToSection = (sectionId) => {
         setActiveSection(sectionId);
@@ -82,7 +85,7 @@ function LectureViewer({ lecture }) {
                     {lecture.sections.map((section) => (
                         <button
                             key={section.id}
-                            className={`sidebar-link ${activeSection === section.id ? 'active' : ''}`}
+                            className={`sidebar-link ${currentActiveSection === section.id ? 'active' : ''}`}
                             onClick={() => scrollToSection(section.id)}
                         >
                             <span className="sidebar-link-icon">{sectionIcons[section.id] || '📄'}</span>
@@ -90,7 +93,7 @@ function LectureViewer({ lecture }) {
                         </button>
                     ))}
                     <button
-                        className={`sidebar-link ${activeSection === 'exercises' ? 'active' : ''}`}
+                        className={`sidebar-link ${currentActiveSection === 'exercises' ? 'active' : ''}`}
                         onClick={() => scrollToSection('exercises')}
                     >
                         <span className="sidebar-link-icon">💻</span>
