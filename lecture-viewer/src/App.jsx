@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import './App.css';
 import LectureViewer from './components/LectureViewer';
 import MobileNav from './components/MobileNav';
+import SearchModal from './components/SearchModal';
 import { lectures, lectureList } from './lectures';
 
 function App() {
@@ -127,21 +128,8 @@ function App() {
         />
       </main>
 
-      {/* Search Modal - to be implemented */}
-      {isSearchOpen && (
-        <div
-          className="search-modal-overlay"
-          onClick={() => setIsSearchOpen(false)}
-        >
-          <div
-            className="search-modal-placeholder"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p>Search functionality coming soon...</p>
-            <button onClick={() => setIsSearchOpen(false)}>Close</button>
-          </div>
-        </div>
-      )}
+      {/* Search Modal */}
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </div>
   );
 }
