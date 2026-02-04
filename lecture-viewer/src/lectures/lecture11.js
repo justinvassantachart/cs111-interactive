@@ -62,6 +62,96 @@ pipe(fds);  // fds[0] = read end, fds[1] = write end
             }
         },
         {
+            id: "pipe-mental-model",
+            title: "🧠 Building Intuition: What IS a Pipe?",
+            content: "Before diving into more code, let's build a mental model of what a pipe actually is. Think of a pipe like a **one-way tube** that connects two processes. Data goes in one end and comes out the other – but only in one direction!",
+            keyPoints: [
+                "🔧 Real-world analogy: Like a pneumatic tube system at a bank drive-through",
+                "📬 Or like passing notes in class – you write it, hand it off, someone else reads it",
+                "➡️ Data flows in ONE direction only: write end → read end",
+                "📦 The pipe has a buffer – it can hold data even if no one is reading yet",
+                "🔒 When ALL write ends close, readers see EOF (end of file)",
+                "⏳ When the buffer is full, writers block until someone reads"
+            ],
+            diagram: `Think of a pipe like a pneumatic tube at a bank:
+
+    WRITER (Parent/Child 1)              READER (Child 2/Parent)
+    ┌─────────────────┐                  ┌─────────────────┐
+    │   "Send this    │                  │   "Received:    │
+    │    data!"       │                  │    data!"       │
+    │       │         │                  │       ↑         │
+    │       ▼         │                  │       │         │
+    │  ┌─────────┐    │                  │  ┌─────────┐    │
+    │  │ write() │    │                  │  │  read() │    │
+    │  └────┬────┘    │                  │  └────┬────┘    │
+    └───────┼─────────┘                  └───────┼─────────┘
+            │                                    ↑
+            │    ╔═══════════════════════════╗   │
+            └───►║   PIPE BUFFER (in kernel)  ║──┘
+                 ║   [data waiting to be read]║
+                 ╚═══════════════════════════╝
+
+Key behaviors:
+• write() puts data INTO the pipe buffer
+• read() takes data OUT OF the pipe buffer  
+• If buffer is empty, read() waits (blocks)
+• If ALL writers close, read() returns 0 (EOF)
+• If buffer is full, write() waits (blocks)`,
+            codeExample: {
+                title: "Pipe behavior demonstrated",
+                language: "c",
+                code: `// A pipe is like a FIFO queue between processes
+int fds[2];
+pipe(fds);  // Creates the "tube"
+
+// Writer puts data in:
+write(fds[1], "Hello", 5);  // Data enters the pipe
+
+// Reader takes data out:
+char buf[10];
+read(fds[0], buf, 5);  // buf now contains "Hello"
+
+// Key insight: The pipe BUFFERS data!
+// You can write multiple times before reading:
+write(fds[1], "AAA", 3);
+write(fds[1], "BBB", 3);
+write(fds[1], "CCC", 3);
+
+// Reading gets them in order (FIFO):
+read(fds[0], buf, 9);  // buf = "AAABBBCCC"`,
+                annotations: [
+                    { match: "pipe(fds)", explanation: "Creates the tube. Think: installing a new pneumatic tube system." },
+                    { match: "write(fds[1]", explanation: "Push data into the tube. It goes into the kernel's buffer." },
+                    { match: "read(fds[0]", explanation: "Pull data out of the tube. It comes from the kernel's buffer." },
+                    { match: "FIFO", explanation: "First In, First Out – data comes out in the same order it went in." }
+                ]
+            }
+        },
+        {
+            id: "check-understanding-1",
+            title: "✅ Check Your Understanding: Pipe Basics",
+            content: "Before we continue, let's make sure the pipe fundamentals are clear. Try to answer these questions in your head before reading the answers!",
+            keyPoints: [
+                "❓ Q1: If you create a pipe but never write to it, what happens when you call read()?",
+                "💡 A1: read() will BLOCK forever waiting for data – unless all write ends are closed, then it returns 0",
+                "❓ Q2: What's the difference between a pipe and a regular file?",
+                "💡 A2: Pipes are in-memory only (no disk), one-directional, and data can only be read ONCE",
+                "❓ Q3: If pipe() gives you fds = {3, 4}, which one is the read end?",
+                "💡 A3: fds[0] = 3 is the read end. Remember: 'Read before Write' means index 0 is for reading!"
+            ],
+            diagram: `Common Misconception Alert! 🚨
+
+Many students think:                  Reality:
+┌─────────────────────────────┐      ┌─────────────────────────────┐
+│  "read() will just return   │      │  read() BLOCKS waiting for  │
+│   0 if there's no data"     │  VS  │  data OR for ALL write ends │
+│                             │      │  to close (signaling EOF)    │
+└─────────────────────────────┘      └─────────────────────────────┘
+
+This is why closing pipe ends correctly is SO important!
+If you forget to close a write end, readers wait FOREVER.`
+        },
+        {
             id: "dup2-recap",
             title: "Recap: dup2 for I/O Redirection",
             content: "**dup2()** is the key to redirecting process I/O. It copies file descriptor information from one FD number to another. After dup2, both FDs refer to the same thing – reading from one advances the position of the other.",
@@ -614,6 +704,84 @@ int main() {
             }
         },
         {
+            id: "debugging-pipe-stalls",
+            title: "🔧 Debug Guide: Diagnosing Pipe Stalls",
+            content: "When your assign3 shell hangs, it's almost always due to improper pipe handling. Here's a systematic approach to debugging stalls:",
+            keyPoints: [
+                "🔍 Symptom: Program hangs and doesn't respond",
+                "🎯 Cause #1: Reader waiting for write end to close",
+                "🎯 Cause #2: Writer blocking because pipe buffer is full",
+                "🎯 Cause #3: Deadlock - parent and child waiting for each other",
+                "✅ Fix: Immediately close unused pipe ends after fork()",
+                "✅ Fix: Write data BEFORE calling waitpid()"
+            ],
+            diagram: `🔧 DEBUGGING FLOWCHART: My program hangs!
+
+                    ┌─────────────────────┐
+                    │  Program is hanging │
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │  Is it during       │
+                    │  read() or write()? │
+                    └──────────┬──────────┘
+                               │
+            ┌──────────────────┼──────────────────┐
+            │                  │                  │
+            ▼                  ▼                  ▼
+    ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+    │ Hanging on    │  │ Hanging on    │  │ Hanging on    │
+    │   read()      │  │   write()     │  │  waitpid()    │
+    └───────┬───────┘  └───────┬───────┘  └───────┬───────┘
+            │                  │                  │
+            ▼                  ▼                  ▼
+    ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+    │ Someone still │  │ Pipe buffer   │  │ Child is      │
+    │ has write end │  │ is full -     │  │ stuck on a    │
+    │ open!         │  │ no one is     │  │ read() or     │
+    │               │  │ reading!      │  │ write()       │
+    └───────┬───────┘  └───────┬───────┘  └───────┬───────┘
+            │                  │                  │
+            ▼                  ▼                  ▼
+    ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+    │ CHECK: Did    │  │ CHECK: Did    │  │ CHECK: Apply  │
+    │ EVERY process │  │ someone close │  │ the read() or │
+    │ close write   │  │ the read end  │  │ write() fixes │
+    │ end after     │  │ before you're │  │ from above    │
+    │ fork()?       │  │ done writing? │  │               │
+    └───────────────┘  └───────────────┘  └───────────────┘
+
+COMMON MISTAKES TABLE:
+┌───────────────────────┬───────────────────────┬───────────────────────┐
+│       Symptom         │         Cause         │         Fix           │
+├───────────────────────┼───────────────────────┼───────────────────────┤
+│ Child hangs on read() │ Child didn't close    │ close(fds[1]) in     │
+│                       │ its own write end     │ child before read     │
+├───────────────────────┼───────────────────────┼───────────────────────┤
+│ Child hangs on read() │ Parent didn't close   │ close(fds[1]) in     │
+│                       │ write end             │ parent after write    │
+├───────────────────────┼───────────────────────┼───────────────────────┤
+│ Parent hangs on       │ Write before read is  │ Don't waitpid before  │
+│ waitpid()             │ blocked by full pipe  │ writing/closing pipe  │
+├───────────────────────┼───────────────────────┼───────────────────────┤
+│ grep never exits      │ Parent still has      │ Parent must close     │
+│ in pipeline           │ write end open        │ BOTH pipe ends        │
+└───────────────────────┴───────────────────────┴───────────────────────┘`
+        },
+        {
+            id: "check-understanding-2",
+            title: "✅ Check Your Understanding: Pipe Stalling",
+            content: "Test your understanding of pipe stalling with these scenarios:",
+            keyPoints: [
+                "❓ Q1: Parent creates pipe, forks child. Parent writes data and waits. Child reads in a loop. Why might it hang?",
+                "💡 A1: If child doesn't close fds[1], its read() never sees EOF, even after parent closes",
+                "❓ Q2: In 'cat file | grep word', who must close what for grep to finish?",
+                "💡 A2: cat must finish (close write end), grep must close write end, AND parent must close BOTH ends",
+                "❓ Q3: Why does the PARENT need to close pipe ends if only children use the pipe?",
+                "💡 A3: Parent got the pipe FDs before forking, so it has copies. If it keeps them open, the pipe stays 'open'!"
+            ]
+        },
+        {
             id: "fd-table-intro",
             title: "File Descriptor Table",
             content: "Why are pipes shared when we call fork()? To understand this, we need to look at how the OS manages file descriptors. The OS maintains a **Process Control Block** for each process, which includes a **file descriptor table** – an array of info about open files/resources.",
@@ -1132,6 +1300,220 @@ if (pid1 != 0) {
     return 0;
 }`,
             explanation: "Each child must close the pipe end it doesn't use, then dup2 the end it does use into the appropriate standard FD. The parent must close BOTH ends so that when cat finishes, grep sees EOF."
+        },
+        {
+            id: "ex4",
+            title: "Debug This: Find the Bug",
+            difficulty: "medium",
+            description: "This shell pipeline implementation hangs. Find and fix ALL the bugs!",
+            hint: "Look for missing close() calls. Every process must close pipe ends it doesn't use.",
+            starterCode: `// Goal: implement "ls | sort"
+// BUG: This hangs! Find all the problems.
+
+int main() {
+    int fds[2];
+    pipe(fds);
+    
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        // Child 1: ls
+        dup2(fds[1], STDOUT_FILENO);
+        char *args[] = {"ls", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        // Child 2: sort
+        dup2(fds[0], STDIN_FILENO);
+        char *args[] = {"sort", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
+    return 0;
+}`,
+            solution: `// FIXED VERSION - with all bugs annotated
+
+int main() {
+    int fds[2];
+    pipe(fds);
+    
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        // Child 1: ls
+        close(fds[0]);  // BUG FIX 1: Close read end (not using it)
+        dup2(fds[1], STDOUT_FILENO);
+        close(fds[1]);  // BUG FIX 2: Close original after dup2
+        char *args[] = {"ls", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        // Child 2: sort
+        close(fds[1]);  // BUG FIX 3: Close write end (not using it)
+        dup2(fds[0], STDIN_FILENO);
+        close(fds[0]);  // BUG FIX 4: Close original after dup2
+        char *args[] = {"sort", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    // BUG FIX 5 & 6: Parent must close BOTH ends!
+    close(fds[0]);
+    close(fds[1]);
+    
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
+    return 0;
+}
+
+// Total bugs: 6 missing close() calls!
+// - Child 1: missing close(fds[0]) and close(fds[1])
+// - Child 2: missing close(fds[1]) and close(fds[0])
+// - Parent: missing close(fds[0]) and close(fds[1])`,
+            explanation: "The original code had 6 bugs - all missing close() calls. Each child must close: (1) the unused pipe end, (2) the original FD after dup2. The parent must close BOTH ends since children have their own copies."
+        },
+        {
+            id: "ex5",
+            title: "Three-Process Pipeline",
+            difficulty: "hard",
+            description: "Implement 'cat file.txt | sort | uniq' - a three-process pipeline with TWO pipes.",
+            hint: "You need TWO pipes: one between cat→sort, one between sort→uniq.",
+            starterCode: `int main() {
+    // TODO: Create TWO pipes
+    // TODO: Fork THREE children
+    // Child 1 (cat): STDOUT → pipe1 write
+    // Child 2 (sort): STDIN ← pipe1 read, STDOUT → pipe2 write
+    // Child 3 (uniq): STDIN ← pipe2 read
+    // Parent: close ALL pipe ends, wait for all children
+    
+    return 0;
+}`,
+            solution: `int main() {
+    int pipe1[2], pipe2[2];
+    pipe(pipe1);  // cat → sort
+    pipe(pipe2);  // sort → uniq
+    
+    // Child 1: cat file.txt
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        // Only need pipe1 write end
+        close(pipe1[0]);
+        close(pipe2[0]);
+        close(pipe2[1]);
+        
+        dup2(pipe1[1], STDOUT_FILENO);
+        close(pipe1[1]);
+        
+        char *args[] = {"cat", "file.txt", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    // Child 2: sort
+    pid_t pid2 = fork();
+    if (pid2 == 0) {
+        // Need pipe1 read and pipe2 write
+        close(pipe1[1]);
+        close(pipe2[0]);
+        
+        dup2(pipe1[0], STDIN_FILENO);
+        close(pipe1[0]);
+        dup2(pipe2[1], STDOUT_FILENO);
+        close(pipe2[1]);
+        
+        char *args[] = {"sort", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    // Child 3: uniq
+    pid_t pid3 = fork();
+    if (pid3 == 0) {
+        // Only need pipe2 read end
+        close(pipe1[0]);
+        close(pipe1[1]);
+        close(pipe2[1]);
+        
+        dup2(pipe2[0], STDIN_FILENO);
+        close(pipe2[0]);
+        
+        char *args[] = {"uniq", NULL};
+        execvp(args[0], args);
+        exit(1);
+    }
+    
+    // Parent closes ALL pipe ends
+    close(pipe1[0]);
+    close(pipe1[1]);
+    close(pipe2[0]);
+    close(pipe2[1]);
+    
+    waitpid(pid1, NULL, 0);
+    waitpid(pid2, NULL, 0);
+    waitpid(pid3, NULL, 0);
+    
+    return 0;
+}`,
+            explanation: "Multi-stage pipelines need N-1 pipes for N processes. Each child must close ALL pipe ends it doesn't use, which gets complex with multiple pipes. The middle process (sort) needs to use BOTH the read end of pipe1 AND the write end of pipe2."
+        },
+        {
+            id: "ex6",
+            title: "Tricky Reference Count",
+            difficulty: "hard",
+            description: "What is the reference count of fds[0] at each commented point? Include ALL processes!",
+            hint: "Remember: fork() creates copies in the child, dup2 increments when it duplicates.",
+            starterCode: `int fds[2];
+pipe(fds);  // Point A: refcount of fds[0] = ___
+
+pid_t pid1 = fork();
+// Point B: refcount = ___
+
+if (pid1 == 0) {
+    dup2(fds[0], STDIN_FILENO);
+    // Point C (in child1 only): refcount = ___
+    close(fds[0]);
+    // Point D (in child1 only): refcount = ___
+    // ... child continues
+}
+
+pid_t pid2 = fork();
+// Point E (in parent only): refcount = ___`,
+            solution: `int fds[2];
+pipe(fds);  // Point A: refcount = 1 (only parent has it)
+
+pid_t pid1 = fork();
+// Point B: refcount = 2 (parent + child1 both have fds[0])
+
+if (pid1 == 0) {
+    // Child1 branch
+    dup2(fds[0], STDIN_FILENO);
+    // Point C: refcount = 3
+    // Why? dup2 makes STDIN point to same entry as fds[0]
+    // Parent has 1, Child1 has 2 (fds[0] AND STDIN)
+    
+    close(fds[0]);
+    // Point D: refcount = 2
+    // Child1 closed fds[0], but STDIN still points there
+    // Parent: fds[0] (1), Child1: STDIN (1) = 2 total
+    
+    // ... child continues
+}
+
+pid_t pid2 = fork();
+// Point E (parent only): refcount = 3
+// After the first fork, child1 is running separately
+// Now parent forks again: parent(1) + child1(1*) + child2(1) = 3
+// *child1's count depends on whether it closed fds[0] yet
+
+// Key insight: refcount tracks ALL references across ALL processes!`,
+            explanation: "Reference counts can be tricky because: (1) fork() copies FD tables, incrementing refcount for shared entries, (2) dup2() makes a new FD point to same entry, incrementing refcount, (3) close() decrements refcount. The entry is freed only when refcount hits 0."
         }
     ]
 };

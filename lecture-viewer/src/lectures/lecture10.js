@@ -6,6 +6,34 @@ export const lecture10 = {
 
     sections: [
         {
+            id: "phone-line",
+            title: "What is a Pipe?",
+            content: `Today we're going to see our first glimpse of how processes can actually communicate with each other. **A pipe is like a phone line between two processes.** One process can talk (write) into one end, and the other process can listen (read) from the other end.`,
+            keyPoints: [
+                "🎯 KEY ANALOGY: A pipe is like a phone line between two processes",
+                "One process writes data into the pipe, another reads it out",
+                "This enables powerful shell features like 'ls | grep txt'",
+                "Processes don't need to know they're connected – they just use stdin/stdout!"
+            ],
+            diagram: `
+The Phone Line Analogy:
+
+  ┌─────────────────┐                              ┌─────────────────┐
+  │   Process A     │                              │   Process B     │
+  │                 │                              │                 │
+  │  "Hello!" ──────┼──────── PIPE ────────────────┼────▶ "Hello!"  │
+  │                 │      (phone line)            │                 │
+  └─────────────────┘                              └─────────────────┘
+       SPEAKER                                          LISTENER
+      (writes)                                          (reads)
+
+  Just like a phone call:
+  • One person talks, the other listens
+  • The message travels through the "line" (pipe)
+  • Neither person needs to know HOW the phone works
+            `
+        },
+        {
             id: "recap-shell",
             title: "Recap: fork, waitpid, execvp and our first shell",
             content: `In Lecture 9, we learned the three key system calls for building a shell: fork() to create child processes, waitpid() to wait for them to finish, and execvp() to run different programs. Now we'll learn how to connect processes together with pipes.`,
@@ -42,6 +70,114 @@ export const lecture10 = {
                     { match: "waitpid(pidOrZero, NULL, 0)", explanation: "Parent waits for child to finish before prompting again." }
                 ]
             }
+        },
+        {
+            id: "imposter-shell-bug",
+            title: "⚠️ Warning: The 'Imposter Shell' Bug",
+            content: `Before we add more features, there's a critical bug pattern you MUST understand. What happens if execvp fails and we forget to terminate the child process?`,
+            keyPoints: [
+                "If execvp fails (e.g., command not found), it returns -1",
+                "If child doesn't exit/throw, it continues running parent's code!",
+                "The child becomes an 'imposter shell' - prompting for input just like the parent",
+                "Symptom: You have to type 'quit' multiple times to exit your shell!",
+                "Always throw/exit after execvp failure in the child process"
+            ],
+            codeExample: {
+                title: "The bug: forgetting to terminate child after execvp failure",
+                language: "cpp",
+                code: `// BUGGY CODE - DO NOT DO THIS!
+pid_t pid = fork();
+if (pid == 0) {
+    execvp(cmd.argv[0], cmd.argv);
+    // BUG: If we reach here, execvp failed, but we don't exit!
+    // The child continues running and goes back to main()...
+    // Now TWO shells are prompting for input!
+}
+waitpid(pid, NULL, 0);
+
+// CORRECT CODE:
+pid_t pid = fork();
+if (pid == 0) {
+    execvp(cmd.argv[0], cmd.argv);
+    throw STSHException("Command not found");  // Child terminates!
+    // OR: exit(1);
+}
+waitpid(pid, NULL, 0);`,
+                annotations: [
+                    { match: "BUG: If we reach here", explanation: "execvp failed, but without exit/throw, the child keeps running parent's code!" },
+                    { match: "TWO shells are prompting", explanation: "Each invalid command spawns another 'imposter' shell. Enter 3 bad commands = 3 extra shells!" },
+                    { match: "throw STSHException", explanation: "ALWAYS terminate the child if execvp fails. The child should NEVER continue past execvp." }
+                ]
+            },
+            diagram: `
+The "Imposter Shell" Bug in Action:
+
+  $ ./stsh                 ← Start shell
+  stsh> blah               ← Invalid command (execvp fails)
+  stsh> blah               ← Another invalid command
+  stsh> blah               ← One more invalid command
+  stsh> quit               ← Try to quit...
+  stsh> quit               ← Still prompting?!
+  stsh> quit               ← Why do I have to quit 3 times?!
+  $                        ← Finally back to real shell
+
+  What happened:
+  ┌─────────────────────────────────────────────────────────────┐
+  │  You now have 3 "imposter" child shells running!            │
+  │  Each invalid command created a child that didn't exit.     │
+  │  Each "imposter" returned to main() and ran the shell loop! │
+  │  You must quit each one individually.                       │
+  └─────────────────────────────────────────────────────────────┘
+            `
+        },
+        {
+            id: "pipeline-demo",
+            title: "🖥️ Demo: Shell Pipelines in Action",
+            content: `Before we dive into implementation, let's see what pipelines can do! These demos show why pipes are so powerful.`,
+            keyPoints: [
+                "grep '(2017)' movies.csv | wc -l → Count movies from 2017",
+                "The | symbol connects stdout of left command to stdin of right",
+                "Commands run IN PARALLEL (not sequentially!)",
+                "sleep 2 | sleep 2 takes 2 seconds, not 4!"
+            ],
+            diagram: `
+Terminal Demo 1: Counting movies from 2017
+──────────────────────────────────────────
+
+  $ grep '(2017)' movies.csv | wc -l
+  147
+
+  What happens:
+  1. grep searches movies.csv for lines containing "(2017)"
+  2. grep's output is piped to wc (word count)
+  3. wc -l counts the lines it receives
+  4. Result: 147 movies from 2017!
+
+Terminal Demo 2: Proving parallel execution
+───────────────────────────────────────────
+
+  $ sleep 2 | sleep 2     ← How long does this take?
+  (2 seconds later...)    ← Only 2 seconds! NOT 4!
+  $
+
+  Both sleep commands run AT THE SAME TIME.
+  If they ran sequentially, it would take 4 seconds.
+
+Terminal Demo 3: Interactive pipeline (conduit program)
+─────────────────────────────────────────────────────────
+
+  $ conduit --delay 1 | conduit --count 3
+  hello                   ← Type "hello"
+  hhh                     ← After 1 sec: 'h' repeated 3x
+  eee                     ← After 1 sec: 'e' repeated 3x
+  lll                     ← After 1 sec: 'l' repeated 3x
+  lll                     ← After 1 sec: 'l' repeated 3x
+  ooo                     ← After 1 sec: 'o' repeated 3x
+
+  First conduit outputs chars with 1-second delay.
+  Second conduit repeats each char 3 times AS IT ARRIVES.
+  Both running simultaneously - you can SEE them working in parallel!
+            `
         },
         {
             id: "shell-features-intro",
@@ -285,6 +421,48 @@ Common bug - forgetting to close:
 └─────────────────────────────────────────────────────────────┘
 
 Solution: Each process must close BOTH unused pipe ends!
+            `
+        },
+        {
+            id: "stop-and-think-dup2",
+            title: "🤔 Stop and Think: Connecting the Pipe",
+            content: `Before we learn dup2(), think about this: we have a pipe with a read end and a write end. We have two child processes in a pipeline. Which ends connect where?`,
+            keyPoints: [
+                "First child writes its output → pipe",
+                "Second child reads its input ← pipe",
+                "📊 POLL QUESTION: What should we connect?",
+                "A) stdout → pipe read, stdin → pipe write",
+                "B) stdout → pipe write, stdin → pipe read ✓",
+                "C) Both to pipe read",
+                "D) Both to pipe write"
+            ],
+            diagram: `
+Think about it before reading on!
+
+Pipeline:  command1 | command2
+
+  command1              command2
+  ┌─────────┐          ┌─────────┐
+  │         │          │         │
+  │ STDOUT ─┼───???────┼→ STDIN  │
+  │         │          │         │
+  └─────────┘          └─────────┘
+
+Which pipe end does STDOUT connect to?
+Which pipe end does STDIN connect from?
+
+═══════════════════════════════════════════════════════════════
+
+Answer: B) stdout → pipe write, stdin → pipe read
+
+Think about DATA FLOW:
+  • command1 WRITES output → so connect to pipe's WRITE end
+  • command2 READS input  → so connect to pipe's READ end
+
+  ┌─────────┐  write   ████████   read   ┌─────────┐
+  │ STDOUT ─┼─────────▶█ PIPE █──────────┼→ STDIN  │
+  └─────────┘          ████████          └─────────┘
+         fds[1]                    fds[0]
             `
         },
         {
@@ -566,16 +744,59 @@ Key insight: stsh-parser gives you a 'pipeline' object with:
             `
         },
         {
+            id: "common-bugs",
+            title: "🐛 Common Bugs Checklist",
+            content: `Before submitting assign3, check for these common mistakes! Each one can cause mysterious hangs or incorrect behavior.`,
+            keyPoints: [
+                "✅ Create pipe BEFORE fork (child needs access!)",
+                "✅ Close unused pipe ends in BOTH parent AND child",
+                "✅ After dup2(), close the original pipe FD",
+                "✅ ALWAYS exit/throw after execvp failure in child",
+                "✅ Parent must wait for ALL children before exiting",
+                "✅ For N-command pipeline: create N-1 pipes"
+            ],
+            diagram: `
+Bug Symptom → Likely Cause:
+
+┌────────────────────────────────────────────────────────────────┐
+│ "Program hangs forever"                                        │
+│   → Forgot to close a write end somewhere                      │
+│   → read() is waiting for EOF that will never come             │
+├────────────────────────────────────────────────────────────────┤
+│ "Have to quit shell multiple times"                            │
+│   → Child continued after execvp failed (imposter shell!)      │
+│   → Add throw/exit after execvp call in child                  │
+├────────────────────────────────────────────────────────────────┤
+│ "Output goes to wrong place / doesn't appear"                  │
+│   → dup2 arguments in wrong order                              │
+│   → Remember: dup2(src, dst) - dst becomes copy of src         │
+├────────────────────────────────────────────────────────────────┤
+│ "Zombie processes accumulate"                                  │
+│   → Forgot to waitpid() on children                            │
+│   → Parent must wait for each child to clean up                │
+├────────────────────────────────────────────────────────────────┤
+│ "Pipeline doesn't produce output"                              │
+│   → stdout buffering issue                                     │
+│   → Try fflush(stdout) or setbuf(stdout, NULL)                 │
+└────────────────────────────────────────────────────────────────┘
+
+🔧 Debugging Tip:
+   Add printf("Child %d: about to exec\\n", getpid());
+   before execvp to trace execution flow!
+            `
+        },
+        {
             id: "summary",
             title: "Lecture 10 Summary",
             content: `Pipes are sets of file descriptors that let us establish communication channels between processes. Combined with dup2(), we can implement shell pipelines where one process's output becomes another's input.`,
             keyPoints: [
+                "🎯 A pipe is like a phone line between two processes",
                 "pipe(fds) creates a pipe: fds[0]=read, fds[1]=write (0=Read, 1=Write)",
                 "Pipes created before fork() are shared between parent and child",
                 "read() blocks until data arrives OR all write ends close",
                 "dup2(src, dst) makes dst refer to same thing as src",
                 "Use dup2 to redirect STDIN/STDOUT to pipe for pipelines",
-                "execvp preserves the file descriptor table"
+                "execvp preserves the file descriptor table (essential for pipelines!)"
             ],
             advantages: [
                 "Simple, powerful IPC (inter-process communication) mechanism",
