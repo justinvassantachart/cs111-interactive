@@ -8,6 +8,7 @@ import lecture9 from './lecture9';
 import lecture10 from './lecture10';
 import lecture11 from './lecture11';
 import lecture12 from './lecture12';
+import lecture13 from './lecture13';
 
 // Export all lectures in an organized structure
 export const lectures = {
@@ -20,6 +21,7 @@ export const lectures = {
     10: lecture10,
     11: lecture11,
     12: lecture12,
+    13: lecture13,
 };
 
 // Get list of all available lectures for navigation

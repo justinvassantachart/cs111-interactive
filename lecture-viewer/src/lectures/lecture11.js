@@ -1119,6 +1119,47 @@ void runPipeline(const pipeline& p) {
             }
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `This lecture deepens your understanding of fd tables and the Open File Table. Midterm questions often ask you to trace reference counts after fork/dup2/close or identify why a pipeline stalls. Know the subprocess pattern cold.`,
+            keyPoints: [
+                "📝 Each process has an fd table (in the PCB); entries point to the Open File Table (OFT)",
+                "📝 fork() copies the fd table but shares OFT entries → refcount increases",
+                "📝 dup2(src, dst) makes dst point to same OFT entry as src → refcount increases",
+                "📝 close(fd) decrements refcount; entry freed when refcount hits 0",
+                "📝 Pipe read EOF only when ALL write-end refcounts reach 0",
+                "📝 Open before fork → shared cursor (refcount 2). Open after fork → separate cursors (refcount 1 each)",
+                "📝 Subprocess pattern: fork → dup2 to redirect → close originals → execvp",
+                "📝 I/O redirection to file: open(file) → dup2(fd, STDOUT_FILENO) → close(fd) → execvp"
+            ],
+            diagram: `
+Midterm Cheat Sheet — FD Table & Open File Table:
+
+┌─────────────────────────────────────────────────────────────┐
+│  Reference Count Tracking:                                   │
+│  ─────────────────────────                                   │
+│  pipe(fds)      → pipe-read: rc=1, pipe-write: rc=1         │
+│  fork()         → pipe-read: rc=2, pipe-write: rc=2         │
+│  dup2(fds[0],0) → pipe-read: rc=3 (parent's fds[0],         │
+│                                      child's fds[0] + fd 0) │
+│  close(fds[0])  → pipe-read: rc=2                           │
+├─────────────────────────────────────────────────────────────┤
+│  open() Before vs After fork():                              │
+│  ──────────────────────────────                              │
+│  BEFORE fork → SHARED session (same cursor, same refcount)   │
+│  AFTER fork  → SEPARATE sessions (own cursor, own refcount)  │
+│                                                              │
+│  Pipes MUST be created BEFORE fork to work!                  │
+├─────────────────────────────────────────────────────────────┤
+│  Stall Debugging Flowchart:                                  │
+│  ─────────────────────────                                   │
+│  Hang on read()    → someone still has write end open        │
+│  Hang on write()   → pipe buffer full, no one reading        │
+│  Hang on waitpid() → child is stalled on read/write          │
+└─────────────────────────────────────────────────────────────┘
+`
+        },
+        {
             id: "summary",
             title: "Lecture 11 Summary",
             content: "We learned how to share pipes with child processes and redirect I/O using dup2. We explored why pipes work across fork() by understanding the file descriptor table and open file table, and why proper closing is critical to avoid stalls.",

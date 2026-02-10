@@ -786,6 +786,49 @@ Bug Symptom → Likely Cause:
             `
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `Pipes and dup2 are core midterm topics. You must know the pipe array convention, the full pipeline setup pattern (pipe → fork → dup2 → close → execvp), and what happens when write ends aren't closed. Expect fd-tracing and "what goes wrong" questions.`,
+            keyPoints: [
+                "📝 pipe(fds): fds[0] = read end, fds[1] = write end. Mnemonic: 'Read before Write' (0 then 1)",
+                "📝 Create pipe BEFORE fork(), otherwise parent and child get separate, unconnected pipes",
+                "📝 dup2(srcfd, dstfd): makes dstfd a copy of srcfd. Old dstfd is closed first",
+                "📝 dup2(fds[1], STDOUT_FILENO) → stdout now writes to pipe",
+                "📝 dup2(fds[0], STDIN_FILENO) → stdin now reads from pipe",
+                "📝 After dup2, CLOSE the original pipe fd (don't need two references)",
+                "📝 EVERY process must close EVERY pipe end it doesn't use — including parent!",
+                "📝 execvp() preserves the fd table — redirections persist into the new program"
+            ],
+            diagram: `
+Midterm Cheat Sheet — Pipes & dup2:
+
+┌─────────────────────────────────────────────────────────────┐
+│  Pipeline Setup Pattern (cmd1 | cmd2):                       │
+│  ─────────────────────────────────────                       │
+│  1. pipe(fds)                                                │
+│  2. fork() → child1:                                         │
+│       close(fds[0])                    // unused end         │
+│       dup2(fds[1], STDOUT_FILENO)      // stdout → pipe      │
+│       close(fds[1])                    // original fd         │
+│       execvp(cmd1, ...)                                      │
+│  3. fork() → child2:                                         │
+│       close(fds[1])                    // unused end         │
+│       dup2(fds[0], STDIN_FILENO)       // stdin ← pipe       │
+│       close(fds[0])                    // original fd         │
+│       execvp(cmd2, ...)                                      │
+│  4. parent: close(fds[0]), close(fds[1])                     │
+│  5. parent: waitpid for both children                        │
+├─────────────────────────────────────────────────────────────┤
+│  "Why does it hang?" checklist:                              │
+│  ──────────────────────────────                              │
+│  □ Child forgot to close its OWN write end → read blocks     │
+│  □ Parent forgot to close write end → child read never EOF   │
+│  □ dup2 args backwards → wrong redirection                   │
+│  □ N commands need N-1 pipes                                 │
+└─────────────────────────────────────────────────────────────┘
+`
+        },
+        {
             id: "summary",
             title: "Lecture 10 Summary",
             content: `Pipes are sets of file descriptors that let us establish communication channels between processes. Combined with dup2(), we can implement shell pipelines where one process's output becomes another's input.`,

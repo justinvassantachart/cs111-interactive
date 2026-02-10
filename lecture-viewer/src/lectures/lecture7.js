@@ -782,6 +782,54 @@ int copy_file_safe(const char *src, const char *dst) {
             }
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `File descriptors and system calls are core midterm material. Know the four syscalls (open, close, read, write), their return values, and the writeAllBytes pattern. Expect tracing questions about fd tables.`,
+            keyPoints: [
+                "📝 open(path, flags, mode): returns fd (lowest available int >= 0), or -1 on error",
+                "📝 FDs 0/1/2 are stdin/stdout/stderr by default",
+                "📝 close(fd): releases the fd so it can be reused",
+                "📝 read(fd, buf, count): returns bytes read (may be < count!), 0 = EOF, -1 = error",
+                "📝 write(fd, buf, count): returns bytes written (may be < count!), -1 = error",
+                "📝 MUST loop writes (writeAllBytes pattern) — partial writes are normal!",
+                "📝 O_RDONLY, O_WRONLY, O_RDWR — basic access flags",
+                "📝 O_CREAT | O_EXCL = create new file, fail if exists. O_TRUNC = overwrite. O_APPEND = append"
+            ],
+            diagram: `
+Midterm Cheat Sheet — File Descriptors & System Calls:
+
+┌─────────────────────────────────────────────────────────────┐
+│  SYSCALL    │  RETURNS              │  KEY GOTCHA            │
+├─────────────────────────────────────────────────────────────┤
+│  open()     │  fd >= 0 or -1        │  Lowest available fd   │
+├─────────────────────────────────────────────────────────────┤
+│  close()    │  0 or -1              │  fd can be reused!     │
+├─────────────────────────────────────────────────────────────┤
+│  read()     │  bytes read, 0, -1    │  May return < count    │
+│             │                       │  0 = EOF, not error    │
+├─────────────────────────────────────────────────────────────┤
+│  write()    │  bytes written or -1  │  MUST LOOP! Partial    │
+│             │                       │  writes are normal     │
+└─────────────────────────────────────────────────────────────┘
+
+writeAllBytes Pattern (KNOW THIS!):
+  void writeAllBytes(int fd, const char *buf, size_t n) {
+      size_t written = 0;
+      while (written < n) {
+          ssize_t count = write(fd, buf + written, n - written);
+          written += count;
+      }
+  }
+
+FD Table After Operations:
+  Initial:    [0:stdin, 1:stdout, 2:stderr]
+  open("a"):  [0:stdin, 1:stdout, 2:stderr, 3:a]
+  open("b"):  [0:stdin, 1:stdout, 2:stderr, 3:a, 4:b]
+  close(3):   [0:stdin, 1:stdout, 2:stderr, ___, 4:b]
+  open("c"):  [0:stdin, 1:stdout, 2:stderr, 3:c, 4:b]  ← reuses 3!
+`
+        },
+        {
             id: "summary",
             title: "Summary: File Descriptor System Calls",
             content: `We've covered the four fundamental system calls for file I/O. These form the foundation for all file operations in Unix/Linux systems.`,

@@ -426,6 +426,57 @@ int pathname_lookup(const struct unixfilesystem *fs, const char *pathname) {
       }
     },
     {
+      id: "exam-prep",
+      title: "🎯 Midterm Prep: What to Know",
+      content: `Filesystems are a major midterm topic! You should be very comfortable with the Unix V6 filesystem's inode structure, directory layout, and path lookup algorithm. Many exam questions involve calculating block addresses and tracing lookups.`,
+      keyPoints: [
+        "📝 Know the inode fields: i_mode (type + permissions), i_nlink, i_size, i_addr[8]",
+        "📝 i_addr layout: entries 0-5 = singly-indirect, entry 6 = singly-indirect, entry 7 = doubly-indirect",
+        "📝 Block math: 512 bytes/block, 2 bytes/block-number → 256 entries per indirect block",
+        "📝 Max file size: 7 × 256 × 512 + 256 × 256 × 512 ≈ 34.5 MB",
+        "📝 Directory entries: 16 bytes each (2-byte inum + 14-byte name). Names NOT null-terminated if 14 chars!",
+        "📝 Path lookup: start at root inode (#1), resolve each component by scanning directory blocks",
+        "📝 Use strncmp (not strcmp!) for directory name comparison",
+        "📝 Superblock fields: s_isize (inode blocks), s_fsize (total blocks), s_nfree (free list cache size)"
+      ],
+      diagram: `
+Midterm Cheat Sheet — Filesystems:
+
+┌─────────────────────────────────────────────────────────────┐
+│  CONCEPT              │  KEY FORMULA / FACT                  │
+├─────────────────────────────────────────────────────────────┤
+│  Block size           │  512 bytes                           │
+├─────────────────────────────────────────────────────────────┤
+│  Block nums per       │  512 / 2 = 256                       │
+│  indirect block       │                                      │
+├─────────────────────────────────────────────────────────────┤
+│  Directory entry      │  16 bytes: 2B inum + 14B name        │
+│  size                 │                                      │
+├─────────────────────────────────────────────────────────────┤
+│  Entries per          │  512 / 16 = 32                       │
+│  directory block      │                                      │
+├─────────────────────────────────────────────────────────────┤
+│  Path lookup steps    │  1. Start at root (inode 1)          │
+│                       │  2. Read inode → get blocks          │
+│                       │  3. Scan dir blocks for name         │
+│                       │  4. Get child inum, repeat           │
+├─────────────────────────────────────────────────────────────┤
+│  Given block index b: │  if b < 7*256: singly-indirect       │
+│                       │     slot = b / 256                   │
+│                       │     offset = b % 256                 │
+│                       │  else: doubly-indirect (i_addr[7])   │
+└─────────────────────────────────────────────────────────────┘
+
+Common Exam Pattern — "How many disk reads to access byte X?":
+  1. Read the inode                                    (1 read)
+  2. Compute block index: X / 512                             
+  3. If singly-indirect: read indirect block            (1 read)
+  4. If doubly-indirect: read double + single indirect  (2 reads)
+  5. Read the data block                               (1 read)
+  Total: 3 reads (singly) or 4 reads (doubly-indirect)
+`
+    },
+    {
       id: "summary",
       title: "Unix V6 Filesystem Summary",
       content: `The Unix V6 Filesystem demonstrates key OS design principles: modularity, layering, name resolution, and virtualization.`,
@@ -465,14 +516,14 @@ int pathname_lookup(const struct unixfilesystem *fs, const char *pathname) {
 // - Number of singly-indirect blocks = 7
 
 int block_size = 512;
-int block_nums_per_indirect = 256;
-int singly_indirect_blocks = 7;
+  int block_nums_per_indirect = 256;
+  int singly_indirect_blocks = 7;
 
-// Maximum bytes addressable with just singly-indirect:
-int max_singly = ____;
+  // Maximum bytes addressable with just singly-indirect:
+  int max_singly = ____;
 
-// Minimum size requiring doubly-indirect:
-int answer = ____;`,
+  // Minimum size requiring doubly-indirect:
+  int answer = ____;`,
       solution: `// Calculate the minimum file size that needs doubly-indirect addressing
 
 // Given:

@@ -853,6 +853,51 @@ int create_file_ordered(const char *path, const void *data, size_t len) {
             }
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `Crash recovery is a core midterm topic — expect questions on why crashes cause inconsistencies, what fsck does, and how ordered writes prevent cross-allocation. This material connects directly to assign2.`,
+            keyPoints: [
+                "📝 Free bitmap: 1 = free, 0 = used. Know how to look up / set bits",
+                "📝 Block cache: LRU eviction, dirty blocks must be written back before eviction",
+                "📝 Delayed writes improve performance but risk data loss on crash",
+                "📝 Multi-block operations are the root cause — crash between writes = inconsistency",
+                "📝 Possible inconsistencies: cross-allocation, orphan inodes, wrong link count, leaked blocks",
+                "📝 Cross-allocation (block in 2 files) is WORSE than leaked block (wasted space)",
+                "📝 fsck: scans entire disk, checks bitmap vs. inodes, fixes link counts, rescues orphans to lost+found",
+                "📝 fsck limitation: must scan ALL blocks — hours for large disks!"
+            ],
+            diagram: `
+Midterm Cheat Sheet — Crash Recovery (Part 1):
+
+┌─────────────────────────────────────────────────────────────┐
+│  CONCEPT              │  KEY FACT                            │
+├─────────────────────────────────────────────────────────────┤
+│  Free bitmap          │  1 = free, 0 = used                  │
+│                       │  One bit per block                   │
+├─────────────────────────────────────────────────────────────┤
+│  Block cache          │  LRU eviction policy                 │
+│                       │  Dirty bit tracks modifications      │
+│                       │  Delayed writes = faster but risky   │
+├─────────────────────────────────────────────────────────────┤
+│  Cross-allocation     │  Block claimed by 2+ inodes          │
+│  (VERY BAD)           │  Write to one file corrupts other    │
+├─────────────────────────────────────────────────────────────┤
+│  Leaked block         │  Block marked used but no inode      │
+│  (recoverable)        │  has it — just wastes space          │
+├─────────────────────────────────────────────────────────────┤
+│  Orphan inode         │  Inode allocated (IALLOC) but no     │
+│                       │  directory entry → add to lost+found │
+├─────────────────────────────────────────────────────────────┤
+│  fsck link count fix  │  Count directory refs to each inode  │
+│                       │  Compare with i_nlink, fix if wrong  │
+└─────────────────────────────────────────────────────────────┘
+
+Exam question pattern:
+  "A crash occurs between step X and step Y. 
+   What inconsistency results? How does fsck fix it?"
+`
+        },
+        {
             id: "summary",
             title: "Crash Recovery Summary",
             content: `We've covered two approaches to crash recovery. Both have tradeoffs, leading to the need for more sophisticated approaches like journaling (covered next lecture).`,

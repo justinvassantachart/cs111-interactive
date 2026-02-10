@@ -721,6 +721,53 @@ $`
             }
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `waitpid and execvp complete the multiprocessing picture. The midterm will test your understanding of the shell pattern (fork/exec/wait), zombie processes, ordering constraints from waitpid, and execvp argument setup.`,
+            keyPoints: [
+                "📝 waitpid(pid, &status, 0): blocks until child with given PID exits. Returns child PID or -1",
+                "📝 waitpid(-1, &status, 0): waits for ANY child to exit",
+                "📝 WIFEXITED(status) / WEXITSTATUS(status): check normal exit / get exit code",
+                "📝 WIFSIGNALED(status) / WTERMSIG(status): check signal kill / get signal number",
+                "📝 Zombie: child that exited but parent hasn't called waitpid yet. Wastes system resources!",
+                "📝 execvp(program, argv): replaces current process with new program. NEVER RETURNS on success!",
+                "📝 argv array MUST be NULL-terminated. argv[0] = program name",
+                "📝 Shell pattern: while(true) { fork → child: execvp → parent: waitpid }"
+            ],
+            diagram: `
+Midterm Cheat Sheet — waitpid & execvp:
+
+┌─────────────────────────────────────────────────────────────┐
+│  waitpid() Cheat Sheet:                                      │
+│  ──────────────────────                                      │
+│  waitpid(pid, &status, 0)  → wait for specific child        │
+│  waitpid(-1, &status, 0)   → wait for ANY child             │
+│  Returns: child PID on success, -1 on error                  │
+│  errno = ECHILD → no more children to wait for               │
+├─────────────────────────────────────────────────────────────┤
+│  Status Macros:                                              │
+│  ──────────────                                              │
+│  WIFEXITED(s)    → true if child exited normally             │
+│  WEXITSTATUS(s)  → exit code (0-255)                         │
+│  WIFSIGNALED(s)  → true if child killed by signal            │
+│  WTERMSIG(s)     → signal number that killed child           │
+├─────────────────────────────────────────────────────────────┤
+│  execvp() Cheat Sheet:                                       │
+│  ──────────────────────                                      │
+│  char *args[] = {"ls", "-la", "/tmp", NULL};                 │
+│  execvp(args[0], args);                                      │
+│  // Code after execvp only runs if execvp FAILED!            │
+│  perror("execvp");  exit(1);                                 │
+├─────────────────────────────────────────────────────────────┤
+│  Ordering Constraints:                                       │
+│  ─────────────────────                                       │
+│  waitpid(pid1) returns → child1 MUST have already exited     │
+│  Code after waitpid → guaranteed to run after child exits    │
+│  Sibling children → NO ordering guarantee between them       │
+└─────────────────────────────────────────────────────────────┘
+`
+        },
+        {
             id: "summary",
             title: "Lecture 9 Summary",
             content: `We learned three essential system calls for multiprocessing: fork() to create processes, waitpid() to wait for children, and execvp() to run different programs. Together, these form the foundation of how shells work.`,

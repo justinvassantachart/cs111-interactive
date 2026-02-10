@@ -1152,6 +1152,50 @@ void configure_filesystem(RecoveryStrategy strategy) {
             }
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `This lecture completes crash recovery — a guaranteed midterm topic. Be able to compare all three approaches, apply ordered write rules, and trace journaling scenarios. Connect everything to assign2!`,
+            keyPoints: [
+                "📝 Ordered Writes Rule 1: Initialize target BEFORE creating a reference to it",
+                "📝 Ordered Writes Rule 2: Remove references BEFORE reusing a resource",
+                "📝 Ordered writes trade leaked resources (acceptable) for no cross-allocation (unacceptable)",
+                "📝 Write-ahead logging (journaling): log WHAT you plan to do, THEN do it",
+                "📝 Transactions: LogBegin → LogPatch/Alloc/Free → LogCommit = atomic unit",
+                "📝 Only COMPLETE transactions (with LogCommit) are replayed on recovery",
+                "📝 Log entries must be IDEMPOTENT: replaying 1× or 100× gives same result",
+                "📝 LogPatch is idempotent ('set X to Y'), appending is NOT ('add Y to X')",
+                "📝 Journaling separates durability (not guaranteed) from consistency (guaranteed)"
+            ],
+            diagram: `
+Midterm Cheat Sheet — Crash Recovery (Part 2):
+
+┌──────────────────┬──────────────────┬──────────────────┬──────────────────┐
+│ Aspect           │ fsck             │ Ordered Writes   │ Journaling       │
+├──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Recovery speed   │ SLOW (scan all)  │ FAST             │ FAST (replay)    │
+├──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Normal perf      │ No impact        │ May force syncs  │ Extra log writes │
+├──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Can leak blocks? │ No (repairs)     │ YES (by design)  │ No               │
+├──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Consistency      │ Restored after   │ Always maintained│ Always maintained│
+│                  │ scan completes   │ (no cross-alloc) │ (transactions)   │
+├──────────────────┼──────────────────┼──────────────────┼──────────────────┤
+│ Used by          │ Legacy / backup  │ BSD soft updates │ ext4, NTFS, HFS+ │
+└──────────────────┴──────────────────┴──────────────────┴──────────────────┘
+
+Ordered Writes — Quick Reference:
+  Creating file:  init inode → mark blocks used → add dirent (LAST!)
+  Deleting file:  remove dirent → clear inode → mark blocks free (LAST!)
+  Key insight:    making something VISIBLE (dirent) is always the LAST step
+
+Journaling — Crash Scenario Analysis:
+  Crash before LogCommit?  → Discard. As if op never happened.
+  Crash after LogCommit but before blocks written?  → Replay log!
+  Crash after blocks written but before checkpoint?  → Replay (idempotent, harmless)
+`
+        },
+        {
             id: "summary",
             title: "Crash Recovery Summary",
             content: `Crash recovery is about managing the tradeoff between durability, consistency, and performance. Modern systems primarily use journaling for fast recovery with strong consistency guarantees.`,

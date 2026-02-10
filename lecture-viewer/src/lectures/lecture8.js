@@ -847,6 +847,53 @@ int main() {
             }
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `fork() is heavily tested on the midterm! Expect questions where you trace process trees, count "Hello" prints, and predict variable values after fork. Master the return value semantics and virtual memory isolation.`,
+            keyPoints: [
+                "📝 fork() returns child PID to parent, 0 to child, -1 on error",
+                "📝 Program = code on disk. Process = running instance with its own memory, PID, fd table",
+                "📝 Child is a CLONE: same code, same variable values, same fd table at time of fork",
+                "📝 After fork, parent and child run independently — order is NON-DETERMINISTIC",
+                "📝 Virtual memory: same virtual addresses, different physical memory",
+                "📝 Copy-on-write: pages shared until one process writes, then OS copies that page",
+                "📝 exit(n) terminates a process immediately — crucial for controlling fork behavior in loops",
+                "📝 N fork() calls without conditionals = 2^N processes"
+            ],
+            diagram: `
+Midterm Cheat Sheet — fork():
+
+┌─────────────────────────────────────────────────────────────┐
+│  fork() Return Values:                                       │
+│  ─────────────────────                                       │
+│  Parent receives: child's PID (positive number)              │
+│  Child receives:  0                                          │
+│  Error:           -1                                         │
+├─────────────────────────────────────────────────────────────┤
+│  Process Counting:                                           │
+│  ─────────────────                                           │
+│  1 fork()  → 2 processes                                     │
+│  2 fork()s → 4 processes (if no conditionals)                │
+│  3 fork()s → 8 processes (if no conditionals)                │
+│  N fork()s → 2^N processes (if no conditionals)              │
+│                                                              │
+│  With conditionals: TRACE carefully!                         │
+│  With exit() in child: only original loops (1 + N children)  │
+├─────────────────────────────────────────────────────────────┤
+│  Variable Independence:                                      │
+│  ─────────────────────                                       │
+│  After fork, variables are SEPARATE COPIES                   │
+│  Child modifying x does NOT change parent's x                │
+│  Same virtual address → different physical memory            │
+└─────────────────────────────────────────────────────────────┘
+
+Common Exam Pattern — "How many times is X printed?":
+  1. Trace the process tree (draw it!)
+  2. Count which processes reach the printf
+  3. Check for conditionals (pid == 0) and exit() calls
+`
+        },
+        {
             id: "summary",
             title: "Lecture 8 Summary",
             content: `This lecture introduced multiprocessing and the fork() system call. We learned how processes are created, how they relate to programs, and how fork() clones a process. Understanding fork() is the foundation for building shells, servers, and understanding concurrent systems.`,

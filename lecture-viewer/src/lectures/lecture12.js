@@ -860,6 +860,52 @@ cout << ...;     ← And this too! 🚀
             `
         },
         {
+            id: "exam-prep",
+            title: "🎯 Midterm Prep: What to Know",
+            content: `Threads, race conditions, and critical sections are heavily tested on the midterm. Know the differences between threads and processes, what is shared vs. private, how race conditions arise, and how to design minimal critical sections.`,
+            keyPoints: [
+                "📝 thread(func, args...) spawns a thread; join() waits for it to finish (MUST join or detach!)",
+                "📝 Threads share: heap, globals, pass-by-ref params. Each thread has its OWN stack (local vars)",
+                "📝 N spawned threads + main thread = N+1 total threads",
+                "📝 Thread execution order is NON-DETERMINISTIC — OS scheduler decides",
+                "📝 Race condition: bug caused by unpredictable thread ordering when accessing shared data",
+                "📝 Even x++ is NOT atomic — it's 3 operations: read, increment, write",
+                "📝 Critical section: code that only ONE thread should execute at a time",
+                "📝 Keep critical sections SMALL — only protect shared-data access, not unrelated work"
+            ],
+            diagram: `
+Midterm Cheat Sheet — Threads & Race Conditions:
+
+┌─────────────────────────────────────────────────────────────┐
+│  Threads vs Processes:                                       │
+│  ─────────────────────                                       │
+│  Processes: separate address spaces (fork = copy)            │
+│  Threads:   SHARED address space (same globals/heap)         │
+│  Processes need pipes/IPC. Threads just share memory.        │
+├─────────────────────────────────────────────────────────────┤
+│  Race Condition Pattern:                                     │
+│  ───────────────────────                                     │
+│  Thread A: read x (x=1)     Thread B: read x (x=1)          │
+│  Thread A: x = x+1 (=2)    Thread B: x = x+1 (=2)          │
+│  Thread A: write x (x=2)   Thread B: write x (x=2)          │
+│  Expected: x=3. Actual: x=2. Lost an increment!             │
+├─────────────────────────────────────────────────────────────┤
+│  Critical Section Design:                                    │
+│  ────────────────────────                                    │
+│  ✅ IN:  shared variable check + modify                      │
+│  ❌ OUT: sleep, printf, independent computation              │
+│  Rule: minimize time in critical section for performance     │
+├─────────────────────────────────────────────────────────────┤
+│  Common Exam Questions:                                      │
+│  ──────────────────────                                      │
+│  • "Is this code thread-safe?" → check for shared writes     │
+│  • "What can go wrong?" → identify race condition scenario   │
+│  • "Design the critical section" → minimal protection        │
+│  • "How many threads?" → count spawned + main                │
+└─────────────────────────────────────────────────────────────┘
+`
+        },
+        {
             id: "summary",
             title: "Lecture 12 Summary",
             content: `We learned about threads as a way to have concurrency within a single process.`,
