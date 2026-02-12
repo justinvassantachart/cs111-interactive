@@ -1,4 +1,7 @@
 // Lecture index - import all lectures here
+import lecture1 from './lecture1';
+import lecture2 from './lecture2';
+import lecture3 from './lecture3';
 import lecture4 from './lecture4';
 import lecture5 from './lecture5';
 import lecture6 from './lecture6';
@@ -13,6 +16,9 @@ import lecture14 from './lecture14';
 
 // Export all lectures in an organized structure
 export const lectures = {
+    1: lecture1,
+    2: lecture2,
+    3: lecture3,
     4: lecture4,
     5: lecture5,
     6: lecture6,
