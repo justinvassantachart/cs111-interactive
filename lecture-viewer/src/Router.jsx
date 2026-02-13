@@ -15,6 +15,14 @@ export const router = createBrowserRouter([
         element: <App />,
     },
     {
+        path: '/section/:sectionId',
+        element: <App />,
+    },
+    {
+        path: '/assignment/:assignId',
+        element: <App />,
+    },
+    {
         // Catch-all redirect to first lecture
         path: '*',
         element: <Navigate to={`/lecture/${firstLectureId}`} replace />,

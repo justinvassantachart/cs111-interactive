@@ -1,29 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 import LectureViewer from './components/LectureViewer';
 import MobileNav from './components/MobileNav';
 import SearchModal from './components/SearchModal';
-import { lectures, lectureList } from './lectures';
+import { lectures, lectureList, sections, sectionList, assignments, assignmentList } from './lectures';
 
 function App() {
-  const { lectureId } = useParams();
+  const { lectureId, sectionId, assignId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const currentLectureId = parseInt(lectureId, 10);
-  const currentLecture = lectures[currentLectureId];
+  // Determine content type from URL
+  let contentType, currentContent, currentContentId;
+  if (location.pathname.startsWith('/section/')) {
+    contentType = 'section';
+    currentContentId = sectionId;
+    currentContent = sections[sectionId];
+  } else if (location.pathname.startsWith('/assignment/')) {
+    contentType = 'assignment';
+    currentContentId = assignId;
+    currentContent = assignments[assignId];
+  } else {
+    contentType = 'lecture';
+    currentContentId = parseInt(lectureId, 10);
+    currentContent = lectures[currentContentId];
+  }
 
   const [activeSection, setActiveSection] = useState(
-    currentLecture?.sections[0]?.id || ''
+    currentContent?.sections[0]?.id || ''
   );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // Reset active section when lecture changes
+  // Reset active section when content changes
   useEffect(() => {
-    if (currentLecture) {
-      setActiveSection(currentLecture.sections[0]?.id || '');
+    if (currentContent) {
+      setActiveSection(currentContent.sections[0]?.id || '');
     }
-  }, [currentLecture]);
+  }, [currentContent]);
 
   // Keyboard shortcut for search (Cmd/Ctrl + K)
   useEffect(() => {
@@ -38,9 +52,18 @@ function App() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleLectureChange = (e) => {
-    const newLectureId = e.target.value;
-    navigate(`/lecture/${newLectureId}`);
+  // Unified navigation handler for the dropdown
+  const handleContentChange = (e) => {
+    const value = e.target.value;
+    // Values are formatted as "type:id" e.g. "lecture:4", "section:s2", "assignment:a0"
+    const [type, id] = value.split(':');
+    if (type === 'lecture') {
+      navigate(`/lecture/${id}`);
+    } else if (type === 'section') {
+      navigate(`/section/${id}`);
+    } else if (type === 'assignment') {
+      navigate(`/assignment/${id}`);
+    }
   };
 
   const handleSectionClick = useCallback((sectionId) => {
@@ -55,13 +78,16 @@ function App() {
     setIsSearchOpen(true);
   };
 
-  // Handle invalid lecture IDs
-  if (!currentLecture) {
+  // Build the current select value
+  const currentSelectValue = `${contentType}:${currentContentId}`;
+
+  // Handle invalid content IDs
+  if (!currentContent) {
     return (
       <div className="app">
         <div className="error-container">
-          <h1>Lecture not found</h1>
-          <p>The requested lecture does not exist.</p>
+          <h1>Content not found</h1>
+          <p>The requested {contentType} does not exist.</p>
           <button onClick={() => navigate('/lecture/4')}>Go to Lecture 4</button>
         </div>
       </div>
@@ -72,12 +98,14 @@ function App() {
     <div className="app">
       {/* Mobile Navigation Drawer */}
       <MobileNav
-        sections={currentLecture.sections}
+        sections={currentContent.sections}
         activeSection={activeSection}
         onSectionClick={handleSectionClick}
         lectureList={lectureList}
-        currentLectureId={currentLectureId}
-        onLectureChange={handleLectureChange}
+        sectionList={sectionList}
+        assignmentList={assignmentList}
+        currentSelectValue={currentSelectValue}
+        onContentChange={handleContentChange}
         onSearchClick={handleSearchClick}
       />
 
@@ -103,17 +131,33 @@ function App() {
               <kbd className="header-search-shortcut">⌘K</kbd>
             </button>
 
-            {/* Lecture Selector */}
+            {/* Content Selector with optgroups */}
             <select
               className="lecture-select"
-              value={currentLectureId}
-              onChange={handleLectureChange}
+              value={currentSelectValue}
+              onChange={handleContentChange}
             >
-              {lectureList.map((lecture) => (
-                <option key={lecture.id} value={lecture.id}>
-                  Lecture {lecture.id}: {lecture.title}
-                </option>
-              ))}
+              <optgroup label="Lectures">
+                {lectureList.map((lecture) => (
+                  <option key={`lecture:${lecture.id}`} value={`lecture:${lecture.id}`}>
+                    Lecture {lecture.id}: {lecture.title}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Sections">
+                {sectionList.map((section) => (
+                  <option key={`section:${section.id}`} value={`section:${section.id}`}>
+                    Section {section.id.replace('s', '')}: {section.title}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Assignments">
+                {assignmentList.map((assignment) => (
+                  <option key={`assignment:${assignment.id}`} value={`assignment:${assignment.id}`}>
+                    Assignment {assignment.id.replace('a', '')}: {assignment.title}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </nav>
         </div>
@@ -121,8 +165,9 @@ function App() {
 
       <main className="app-main">
         <LectureViewer
-          key={currentLectureId}
-          lecture={currentLecture}
+          key={currentSelectValue}
+          lecture={currentContent}
+          contentType={contentType}
           activeSection={activeSection}
           onActiveSectionChange={setActiveSection}
         />
@@ -135,4 +180,3 @@ function App() {
 }
 
 export default App;
-

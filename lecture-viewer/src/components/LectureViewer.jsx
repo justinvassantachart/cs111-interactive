@@ -13,7 +13,7 @@ const sectionIcons = {
     'summary': '✨'
 };
 
-function LectureViewer({ lecture, activeSection, onActiveSectionChange }) {
+function LectureViewer({ lecture, contentType = 'lecture', activeSection, onActiveSectionChange }) {
     const isScrollingRef = useRef(false);
 
     // Use internal state if no props provided (backwards compatibility)
@@ -107,7 +107,11 @@ function LectureViewer({ lecture, activeSection, onActiveSectionChange }) {
                 <div className="content-inner">
                     {/* Lecture Header */}
                     <header className="lecture-header">
-                        <span className="lecture-number">Lecture {lecture.id}</span>
+                        <span className="lecture-number">
+                            {contentType === 'lecture' && `Lecture ${lecture.id}`}
+                            {contentType === 'section' && `Section ${lecture.id.replace('s', '')}`}
+                            {contentType === 'assignment' && `Assignment ${lecture.id.replace('a', '')}`}
+                        </span>
                         <h1 className="lecture-title">{lecture.title}</h1>
                         <p className="lecture-subtitle">{lecture.subtitle}</p>
                     </header>

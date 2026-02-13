@@ -5,8 +5,10 @@ function MobileNav({
     activeSection,
     onSectionClick,
     lectureList,
-    currentLectureId,
-    onLectureChange,
+    sectionList = [],
+    assignmentList = [],
+    currentSelectValue,
+    onContentChange,
     onSearchClick
 }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -33,8 +35,8 @@ function MobileNav({
         setIsOpen(false);
     };
 
-    const handleLectureChange = (e) => {
-        onLectureChange(e);
+    const handleContentChange = (e) => {
+        onContentChange(e);
         setIsOpen(false);
     };
 
@@ -108,19 +110,39 @@ function MobileNav({
                     <span>Search lectures...</span>
                 </button>
 
-                {/* Lecture Selector */}
+                {/* Content Selector */}
                 <div className="mobile-drawer-section">
-                    <p className="mobile-drawer-section-title">Lecture</p>
+                    <p className="mobile-drawer-section-title">Content</p>
                     <select
                         className="mobile-lecture-select"
-                        value={currentLectureId}
-                        onChange={handleLectureChange}
+                        value={currentSelectValue}
+                        onChange={handleContentChange}
                     >
-                        {lectureList.map((lecture) => (
-                            <option key={lecture.id} value={lecture.id}>
-                                {lecture.id}: {lecture.title}
-                            </option>
-                        ))}
+                        <optgroup label="Lectures">
+                            {lectureList.map((lecture) => (
+                                <option key={`lecture:${lecture.id}`} value={`lecture:${lecture.id}`}>
+                                    {lecture.id}: {lecture.title}
+                                </option>
+                            ))}
+                        </optgroup>
+                        {sectionList.length > 0 && (
+                            <optgroup label="Sections">
+                                {sectionList.map((section) => (
+                                    <option key={`section:${section.id}`} value={`section:${section.id}`}>
+                                        Section {section.id.replace('s', '')}: {section.title}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        )}
+                        {assignmentList.length > 0 && (
+                            <optgroup label="Assignments">
+                                {assignmentList.map((assignment) => (
+                                    <option key={`assignment:${assignment.id}`} value={`assignment:${assignment.id}`}>
+                                        Assign {assignment.id.replace('a', '')}: {assignment.title}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        )}
                     </select>
                 </div>
 

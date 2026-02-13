@@ -66,8 +66,8 @@ function SearchModal({ isOpen, onClose }) {
     };
 
     const handleResultClick = useCallback((result) => {
-        // Navigate to the lecture and section
-        const path = `/lecture/${result.lectureId}`;
+        // Navigate using the route from search index
+        const path = result.route || `/lecture/${result.lectureId}`;
         navigate(path);
 
         // Close modal
@@ -216,7 +216,7 @@ function SearchModal({ isOpen, onClose }) {
                                             }}
                                         />
                                         <div className="search-result-meta">
-                                            Lecture {result.lectureId}: {result.lectureTitle}
+                                            {(result.contentType === 'section' ? 'Section' : result.contentType === 'assignment' ? 'Assignment' : 'Lecture')} {result.lectureId}: {result.lectureTitle}
                                         </div>
                                     </div>
                                     <div className="search-result-arrow">

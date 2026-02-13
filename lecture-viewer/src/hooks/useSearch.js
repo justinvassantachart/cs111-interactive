@@ -1,122 +1,157 @@
 import { useMemo, useState, useCallback } from 'react';
-import { lectures } from '../lectures';
+import { lectures, sections, assignments } from '../lectures';
 
 /**
- * Hook for searching across all lecture content
- * Returns search results with lecture, section, and match context
+ * Hook for searching across all content (lectures, sections, assignments)
+ * Returns search results with content type, section, and match context
  */
 export function useSearch() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState([]);
 
-    // Build search index from all lectures on first load
+    // Build search index from all content on first load
     const searchIndex = useMemo(() => {
         const index = [];
 
-        Object.values(lectures).forEach((lecture) => {
-            // Index lecture title and subtitle
+        // Helper to index a content item (works for lectures, sections, and assignments)
+        const indexContent = (item, contentType, routePrefix) => {
+            const itemId = item.id;
+
+            // Index title and subtitle
             index.push({
-                type: 'lecture',
-                lectureId: lecture.id,
-                lectureTitle: lecture.title,
+                type: contentType,
+                contentType,
+                contentId: itemId,
+                lectureId: itemId, // kept for backwards compatibility with SearchModal
+                lectureTitle: item.title,
                 sectionId: null,
                 sectionTitle: null,
-                text: `${lecture.title} ${lecture.subtitle}`,
-                preview: lecture.subtitle,
-                priority: 1 // High priority for titles
+                text: `${item.title} ${item.subtitle}`,
+                preview: item.subtitle,
+                priority: 1,
+                route: `${routePrefix}/${itemId}`
             });
 
             // Index key takeaway
-            if (lecture.keyTakeaway) {
+            if (item.keyTakeaway) {
                 index.push({
                     type: 'takeaway',
-                    lectureId: lecture.id,
-                    lectureTitle: lecture.title,
+                    contentType,
+                    contentId: itemId,
+                    lectureId: itemId,
+                    lectureTitle: item.title,
                     sectionId: null,
                     sectionTitle: 'Key Takeaway',
-                    text: lecture.keyTakeaway,
-                    preview: lecture.keyTakeaway,
-                    priority: 2
+                    text: item.keyTakeaway,
+                    preview: item.keyTakeaway,
+                    priority: 2,
+                    route: `${routePrefix}/${itemId}`
                 });
             }
 
             // Index each section
-            lecture.sections.forEach((section) => {
-                // Section title and content
-                index.push({
-                    type: 'section',
-                    lectureId: lecture.id,
-                    lectureTitle: lecture.title,
-                    sectionId: section.id,
-                    sectionTitle: section.title,
-                    text: `${section.title} ${section.content || ''}`,
-                    preview: section.content?.substring(0, 150) || section.title,
-                    priority: 2
-                });
-
-                // Key points
-                if (section.keyPoints) {
-                    section.keyPoints.forEach((point, idx) => {
-                        index.push({
-                            type: 'keypoint',
-                            lectureId: lecture.id,
-                            lectureTitle: lecture.title,
-                            sectionId: section.id,
-                            sectionTitle: section.title,
-                            text: point,
-                            preview: point,
-                            priority: 3
-                        });
-                    });
-                }
-
-                // Code examples
-                if (section.codeExample) {
+            if (item.sections) {
+                item.sections.forEach((section) => {
+                    // Section title and content
                     index.push({
-                        type: 'code',
-                        lectureId: lecture.id,
-                        lectureTitle: lecture.title,
+                        type: 'section',
+                        contentType,
+                        contentId: itemId,
+                        lectureId: itemId,
+                        lectureTitle: item.title,
                         sectionId: section.id,
                         sectionTitle: section.title,
-                        text: `${section.codeExample.title} ${section.codeExample.code}`,
-                        preview: section.codeExample.title,
-                        priority: 4
+                        text: `${section.title} ${section.content || ''}`,
+                        preview: section.content?.substring(0, 150) || section.title,
+                        priority: 2,
+                        route: `${routePrefix}/${itemId}`
                     });
 
-                    // Code annotations
-                    if (section.codeExample.annotations) {
-                        section.codeExample.annotations.forEach((anno) => {
+                    // Key points
+                    if (section.keyPoints) {
+                        section.keyPoints.forEach((point) => {
                             index.push({
-                                type: 'annotation',
-                                lectureId: lecture.id,
-                                lectureTitle: lecture.title,
+                                type: 'keypoint',
+                                contentType,
+                                contentId: itemId,
+                                lectureId: itemId,
+                                lectureTitle: item.title,
                                 sectionId: section.id,
                                 sectionTitle: section.title,
-                                text: `${anno.match} ${anno.explanation}`,
-                                preview: `${anno.match}: ${anno.explanation.substring(0, 100)}`,
-                                priority: 5
+                                text: point,
+                                preview: point,
+                                priority: 3,
+                                route: `${routePrefix}/${itemId}`
                             });
                         });
                     }
-                }
-            });
+
+                    // Code examples
+                    if (section.codeExample) {
+                        index.push({
+                            type: 'code',
+                            contentType,
+                            contentId: itemId,
+                            lectureId: itemId,
+                            lectureTitle: item.title,
+                            sectionId: section.id,
+                            sectionTitle: section.title,
+                            text: `${section.codeExample.title} ${section.codeExample.code}`,
+                            preview: section.codeExample.title,
+                            priority: 4,
+                            route: `${routePrefix}/${itemId}`
+                        });
+
+                        // Code annotations
+                        if (section.codeExample.annotations) {
+                            section.codeExample.annotations.forEach((anno) => {
+                                index.push({
+                                    type: 'annotation',
+                                    contentType,
+                                    contentId: itemId,
+                                    lectureId: itemId,
+                                    lectureTitle: item.title,
+                                    sectionId: section.id,
+                                    sectionTitle: section.title,
+                                    text: `${anno.match} ${anno.explanation}`,
+                                    preview: `${anno.match}: ${anno.explanation.substring(0, 100)}`,
+                                    priority: 5,
+                                    route: `${routePrefix}/${itemId}`
+                                });
+                            });
+                        }
+                    }
+                });
+            }
 
             // Index exercises
-            if (lecture.exercises) {
-                lecture.exercises.forEach((exercise) => {
+            if (item.exercises) {
+                item.exercises.forEach((exercise) => {
                     index.push({
                         type: 'exercise',
-                        lectureId: lecture.id,
-                        lectureTitle: lecture.title,
+                        contentType,
+                        contentId: itemId,
+                        lectureId: itemId,
+                        lectureTitle: item.title,
                         sectionId: 'exercises',
                         sectionTitle: exercise.title,
                         text: `${exercise.title} ${exercise.description} ${exercise.hint || ''}`,
                         preview: exercise.description.substring(0, 150),
-                        priority: 3
+                        priority: 3,
+                        route: `${routePrefix}/${itemId}`
                     });
                 });
             }
-        });
+        };
+
+        // Index all lectures
+        Object.values(lectures).forEach((item) => indexContent(item, 'lecture', '/lecture'));
+
+        // Index all sections
+        Object.values(sections).forEach((item) => indexContent(item, 'section', '/section'));
+
+        // Index all assignments
+        Object.values(assignments).forEach((item) => indexContent(item, 'assignment', '/assignment'));
 
         return index;
     }, []);
@@ -172,10 +207,10 @@ export function useSearch() {
             .sort((a, b) => b.score - a.score)
             .slice(0, 20); // Limit to 20 results
 
-        // Deduplicate by lectureId + sectionId (keep highest scoring)
+        // Deduplicate by contentId + sectionId (keep highest scoring)
         const seen = new Set();
         const deduplicated = filtered.filter((entry) => {
-            const key = `${entry.lectureId}-${entry.sectionId}`;
+            const key = `${entry.contentType}-${entry.contentId}-${entry.sectionId}`;
             if (seen.has(key)) return false;
             seen.add(key);
             return true;
