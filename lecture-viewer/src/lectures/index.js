@@ -13,6 +13,8 @@ import lecture11 from './lecture11';
 import lecture12 from './lecture12';
 import lecture13 from './lecture13';
 import lecture14 from './lecture14';
+import lecture16 from './lecture16';
+import lecture15 from './lecture15';
 
 // Section imports
 import section2 from './section2';
@@ -41,6 +43,8 @@ export const lectures = {
     12: lecture12,
     13: lecture13,
     14: lecture14,
+    16: lecture16,
+    15: lecture15,
 };
 
 // Export sections keyed by section ID string
